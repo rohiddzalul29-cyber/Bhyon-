@@ -1715,9 +1715,7 @@
               align-items: center;
             "
           >
-            <button class="btn-order" onclick="submitOrder()">
-              Pesan via WhatsApp
-            </button>
+            <button class="btn-order" onclick="submitOrder()">Pesan</button>
             <button class="btn-order btn-qris" onclick="openQrisModal()">
               Bayar via QRIS
             </button>
@@ -2831,11 +2829,13 @@
         const contact = document.getElementById("orderContact").value.trim();
 
         if (!date || !name || !device || !location || !contact) {
-          alert("⚠️ Mohon lengkapi semua data sebelum memesan!");
+          alert("⚠️ Woilah cik lengkapi dahulu pemesanan nih woooiii!");
           return;
         }
         if (!selectedPrice) {
-          alert("⚠️ Silakan pilih aplikasi dan paket harga terlebih dahulu!");
+          alert(
+            "⚠️ Woilah cik pilih aplikasi dan paket harga terlebih dahulu!",
+          );
           return;
         }
 
@@ -2896,5 +2896,506 @@
         dateInput.value = new Date().toISOString().split("T")[0];
       }
     </script>
+
+    <!-- ============================================================
+         PIXEL MASCOT — Karakter smartphone 8-bit berwarna biru
+         Muncul setelah form diisi lengkap, mengarahkan user ke tombol
+    ============================================================ -->
+    <style>
+      /* ---- Wrapper maskot — fixed, posisi di-update JS setiap frame ---- */
+      #mascot-wrapper {
+        position: fixed;
+        /* left & top di-set oleh JS mengikuti posisi tombol */
+        left: 0;
+        top: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+        pointer-events: none;
+        opacity: 0;
+        /* Hanya fade — TANPA transition transform agar tidak tertinggal
+           saat scroll; transform dipakai hanya untuk center alignment */
+        transition: opacity 0.5s ease;
+        will-change: left, top;
+      }
+
+      /* Saat maskot terlihat */
+      #mascot-wrapper.mascot-visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      /* ---- Speech bubble (balon kata) ---- */
+      .mascot-bubble {
+        background: #1a1a3e;
+        border: 2px solid #00e5ff;
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-size: 0.72rem;
+        font-family: "DM Sans", sans-serif;
+        color: #e8e8ff;
+        text-align: center;
+        max-width: 160px;
+        line-height: 1.4;
+        position: relative;
+        margin-bottom: 6px;
+        box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
+      }
+      /* Panah ke bawah dari bubble */
+      .mascot-bubble::after {
+        content: "";
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 4px solid transparent;
+        border-top-color: #00e5ff;
+      }
+
+      /* ---- Tombol X tutup maskot ---- */
+      .mascot-close {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 18px;
+        height: 18px;
+        background: #ff3cac;
+        border: none;
+        border-radius: 50%;
+        color: white;
+        font-size: 0.6rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        line-height: 1;
+        z-index: 10;
+        transition: background 0.2s;
+      }
+      .mascot-close:hover {
+        background: #c71585;
+      }
+
+      /* ---- Canvas karakter pixel ---- */
+      #mascot-canvas {
+        display: block;
+        image-rendering: pixelated; /* agar piksel tajam */
+        image-rendering: crisp-edges;
+        cursor: pointer;
+      }
+
+      /* ---- Animasi berjalan (bobbing naik-turun) ---- */
+      @keyframes mascot-walk {
+        0%,
+        100% {
+          transform: translateY(0px);
+        }
+        50% {
+          transform: translateY(-4px);
+        }
+      }
+
+      /* ---- Animasi lompat saat hover ---- */
+      @keyframes mascot-jump {
+        0% {
+          transform: translateY(0px);
+        }
+        30% {
+          transform: translateY(-14px);
+        }
+        60% {
+          transform: translateY(-4px);
+        }
+        80% {
+          transform: translateY(-10px);
+        }
+        100% {
+          transform: translateY(0px);
+        }
+      }
+
+      /* Terapkan animasi berjalan secara default */
+      #mascot-canvas.walking {
+        animation: mascot-walk 0.6s ease-in-out infinite;
+      }
+      #mascot-canvas.jumping {
+        animation: mascot-jump 0.5s ease-in-out;
+      }
+    </style>
+
+    <!-- HTML struktur maskot -->
+    <div id="mascot-wrapper">
+      <!-- Bubble dengan teks arahan & tombol tutup -->
+      <div class="mascot-bubble" id="mascot-bubble">
+        <button class="mascot-close" id="mascot-close-btn" title="Tutup">
+          ✕
+        </button>
+        <span id="mascot-bubble-text">Tekan tombol ini untuk memesan! 👆</span>
+      </div>
+      <!-- Canvas tempat karakter digambar -->
+      <canvas
+        id="mascot-canvas"
+        width="72"
+        height="96"
+        class="walking"
+      ></canvas>
+    </div>
+
+    <script>
+      /* ============================================================
+       PIXEL MASCOT SCRIPT
+       Menggambar karakter smartphone 8-bit di canvas & mengelola
+       logika tampil/sembunyikan + interaksi hover/idle
+    ============================================================ */
+      (function () {
+        "use strict";
+
+        /* -- Referensi elemen -- */
+        const wrapper = document.getElementById("mascot-wrapper");
+        const canvas = document.getElementById("mascot-canvas");
+        const ctx = canvas.getContext("2d");
+        const bubble = document.getElementById("mascot-bubble");
+        const bubbleTxt = document.getElementById("mascot-bubble-text");
+        const closeBtn = document.getElementById("mascot-close-btn");
+
+        /* ---- Warna palat 8-bit ---- */
+        const C = {
+          body: "#2563eb", // biru tubuh
+          bodyD: "#1d4ed8", // biru gelap (sisi)
+          screen: "#0f172a", // layar hitam
+          screenG: "#22d3ee", // glint layar
+          eye: "#ffffff", // mata putih
+          eyeP: "#00e5ff", // pupil cyan
+          mouth: "#00e5ff", // mulut
+          btn: "#60a5fa", // tombol samping
+          arm: "#3b82f6", // lengan
+          leg: "#1d4ed8", // kaki
+          shoe: "#0f172a", // ujung kaki
+          outline: "#0f172a", // outline
+          shine: "rgba(255,255,255,0.18)", // kilap
+        };
+
+        /* -- State animasi -- */
+        let frame = 0; // counter frame untuk animasi
+        let blinkTimer = 0; // timer kedip mata
+        let isBlinking = false; // sedang berkedip?
+        let leftArmUp = false; // posisi lengan kiri (untuk wave)
+        let step = 0; // langkah kaki (0 atau 1)
+        let mascotStep = 0; // step maskot: 0=pesan, 1=qris
+
+        /* -------------------------------------------------------
+         FUNGSI GAMBAR PIXEL
+         Semua drawing menggunakan ctx.fillRect (pixel art style)
+      ------------------------------------------------------- */
+
+        /**
+         * Menggambar satu "piksel" berukuran 4x4px di posisi grid (px,py)
+         * Koordinat grid dimulai dari 0,0 di kiri atas canvas
+         */
+        function px(gx, gy, color) {
+          const SZ = 4; // ukuran satu piksel
+          ctx.fillStyle = color;
+          ctx.fillRect(gx * SZ, gy * SZ, SZ, SZ);
+        }
+
+        /**
+         * Menggambar blok piksel persegi panjang
+         */
+        function pxRect(gx, gy, gw, gh, color) {
+          const SZ = 4;
+          ctx.fillStyle = color;
+          ctx.fillRect(gx * SZ, gy * SZ, gw * SZ, gh * SZ);
+        }
+
+        /**
+         * Fungsi utama render karakter setiap frame
+         * @param {boolean} waving  - apakah sedang melambaikan tangan
+         */
+        function drawCharacter(waving) {
+          /* Bersihkan canvas */
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          /* Pilih posisi kaki berdasarkan step animasi berjalan */
+          const legOff = step === 0 ? 0 : 1; // offset kaki bergantian
+
+          /* === TUBUH UTAMA (badan smartphone) ===
+           Grid: x=2..15, y=1..17 (lebar 14, tinggi 16) */
+          // Outline/bayangan kanan-bawah
+          pxRect(3, 2, 12, 16, C.bodyD);
+          // Badan utama
+          pxRect(2, 1, 12, 16, C.body);
+
+          /* === LAYAR (wajah) ===
+           Dibuat sedikit lebih kecil dari badan */
+          pxRect(3, 2, 10, 11, C.screen);
+          // Kilap layar (sudut kiri atas)
+          px(3, 2, C.shine);
+          px(4, 2, C.shine);
+          px(3, 3, C.shine);
+
+          /* === KAMERA DEPAN (notch kecil) === */
+          pxRect(7, 1, 2, 1, C.outline);
+
+          /* === MATA ===
+           Dua bola mata di dalam layar */
+          // Mata kiri
+          pxRect(4, 4, 2, 2, C.eye);
+          px(4 + (isBlinking ? 0 : 0), isBlinking ? 5 : 4, C.eyeP); // pupil / kedip
+          if (isBlinking) {
+            // Saat kedip: gambar garis tipis sebagai kelopak
+            pxRect(4, 5, 2, 1, C.outline);
+          }
+          // Mata kanan
+          pxRect(9, 4, 2, 2, C.eye);
+          if (isBlinking) {
+            pxRect(9, 5, 2, 1, C.outline);
+          } else {
+            px(9, 4, C.eyeP);
+          }
+
+          /* === MULUT (senyum kecil) === */
+          px(5, 8, C.mouth);
+          px(6, 9, C.mouth);
+          px(7, 9, C.mouth);
+          px(8, 9, C.mouth);
+          px(9, 8, C.mouth);
+
+          /* === TOMBOL SAMPING SMARTPHONE === */
+          px(14, 5, C.btn);
+          px(14, 6, C.btn);
+          px(14, 8, C.btn);
+          px(14, 9, C.btn);
+          px(14, 10, C.btn);
+
+          /* === HOME INDICATOR (bawah layar) === */
+          pxRect(5, 14, 6, 1, C.bodyD);
+
+          /* === TANGAN KIRI ===
+           waving=true → tangan ke atas; idle → ke bawah */
+          const lArmY = waving ? 3 : 10;
+          pxRect(0, lArmY, 2, 3, C.arm);
+
+          /* === TANGAN KANAN (selalu ke bawah) === */
+          pxRect(14, 10, 2, 3, C.arm);
+
+          /* === KAKI (bergantian untuk efek berjalan) ===
+           Kaki kiri */
+          pxRect(4, 17, 3, 3, C.leg);
+          pxRect(3, 19 + legOff, 4, 1, C.shoe); // sepatu
+          // Kaki kanan
+          pxRect(9, 17, 3, 3, C.leg);
+          pxRect(9, 19 + (1 - legOff), 4, 1, C.shoe); // sepatu bergantian
+        }
+
+        /* -------------------------------------------------------
+         LOOP ANIMASI — berjalan setiap ~100ms
+      ------------------------------------------------------- */
+        function animLoop() {
+          frame++;
+
+          /* Ganti langkah kaki setiap 6 frame */
+          if (frame % 6 === 0) {
+            step = step === 0 ? 1 : 0;
+          }
+
+          /* Logika kedip: kedip setiap ~80 frame, durasi 4 frame */
+          blinkTimer++;
+          if (blinkTimer > 80 && !isBlinking) {
+            isBlinking = true;
+            blinkTimer = 0;
+          }
+          if (isBlinking && blinkTimer > 4) {
+            isBlinking = false;
+          }
+
+          /* Gambar karakter (tangan tidak melambaikan = false) */
+          drawCharacter(false);
+        }
+
+        /* Mulai loop dengan interval 100ms */
+        let animInterval = setInterval(animLoop, 100);
+
+        /* -------------------------------------------------------
+         INTERAKSI HOVER — karakter melambaikan tangan & lompat
+      ------------------------------------------------------- */
+        canvas.addEventListener("mouseenter", function () {
+          /* Hentikan animasi walk, mainkan jump via CSS */
+          canvas.classList.remove("walking");
+          canvas.classList.add("jumping");
+          /* Gambar karakter dengan tangan melambai */
+          drawCharacter(true);
+        });
+
+        canvas.addEventListener("mouseleave", function () {
+          /* Kembali ke animasi berjalan */
+          canvas.classList.remove("jumping");
+          canvas.classList.add("walking");
+        });
+
+        /* Setelah animasi jump selesai, kembali ke walking */
+        canvas.addEventListener("animationend", function (e) {
+          if (e.animationName === "mascot-jump") {
+            canvas.classList.remove("jumping");
+            canvas.classList.add("walking");
+          }
+        });
+
+        /* -------------------------------------------------------
+         LOGIKA MUNCUL — tampilkan maskot setelah form lengkap
+      ------------------------------------------------------- */
+
+        /**
+         * Cek apakah semua field form sudah diisi
+         */
+        function isFormComplete() {
+          const date = document.getElementById("orderDate")?.value;
+          const name = document.getElementById("orderName")?.value.trim();
+          const device = document.getElementById("orderDevice")?.value.trim();
+          const location = document
+            .getElementById("orderLocation")
+            ?.value.trim();
+          const contact = document.getElementById("orderContact")?.value.trim();
+          return date && name && device && location && contact;
+        }
+
+        /* -------------------------------------------------------
+         TRACKING POSISI — maskot mengikuti tombol saat scroll
+         Menggunakan requestAnimationFrame agar selalu sinkron
+         dengan posisi tombol di layar
+      ------------------------------------------------------- */
+
+        /* Tombol target aktif saat ini (null = maskot tidak tampil) */
+        let activeTarget = null;
+
+        /**
+         * Hitung posisi wrapper agar karakter duduk tepat di ATAS
+         * tengah tombol target, lalu terapkan ke style.left / style.top
+         */
+        function updatePosition() {
+          if (!activeTarget) return;
+
+          const rect = activeTarget.getBoundingClientRect();
+          const wrapperW = wrapper.offsetWidth || 80; // lebar wrapper
+          const wrapperH = wrapper.offsetHeight || 130; // tinggi wrapper
+
+          /* Tengah horizontal tombol */
+          const centerX = rect.left + rect.width / 2;
+
+          /* Tepat di atas tombol, dengan jarak 8px */
+          const topY = rect.top - wrapperH - 8;
+
+          /* Clamp agar tidak keluar layar kiri/kanan */
+          const left = Math.min(
+            Math.max(8, centerX - wrapperW / 2),
+            window.innerWidth - wrapperW - 8,
+          );
+          /* Clamp agar tidak keluar layar atas */
+          const top = Math.max(8, topY);
+
+          wrapper.style.left = left + "px";
+          wrapper.style.top = top + "px";
+        }
+
+        /* Loop RAF — terus update selama maskot aktif */
+        let trackingRAF = null;
+        function startTracking() {
+          function tick() {
+            updatePosition();
+            trackingRAF = requestAnimationFrame(tick);
+          }
+          if (trackingRAF) cancelAnimationFrame(trackingRAF);
+          trackingRAF = requestAnimationFrame(tick);
+        }
+        function stopTracking() {
+          if (trackingRAF) {
+            cancelAnimationFrame(trackingRAF);
+            trackingRAF = null;
+          }
+        }
+
+        /**
+         * Sembunyikan maskot
+         */
+        function hideMascot() {
+          wrapper.classList.remove("mascot-visible");
+          activeTarget = null;
+          stopTracking();
+        }
+
+        /**
+         * Step 0: Arahkan ke tombol "Pesan"
+         */
+        function showStep0() {
+          mascotStep = 0;
+          activeTarget = document.querySelector(".btn-order:not(.btn-qris)");
+          bubbleTxt.textContent = "Tekan tombol ini untuk memesan! 👇";
+          wrapper.classList.add("mascot-visible");
+          startTracking(); /* mulai ikuti scroll */
+        }
+
+        /**
+         * Step 1: Arahkan ke tombol "Bayar via QRIS"
+         */
+        function showStep1() {
+          mascotStep = 1;
+          activeTarget = document.querySelector(".btn-order.btn-qris");
+          bubbleTxt.textContent =
+            "Sebelum memesan, unduh dahulu kode pembayarannya! 📥";
+          wrapper.classList.add("mascot-visible");
+          startTracking(); /* terus ikuti scroll */
+        }
+
+        /* -------------------------------------------------------
+         TOMBOL X — tutup bubble, pindah ke step berikutnya
+      ------------------------------------------------------- */
+        closeBtn.addEventListener("click", function () {
+          if (mascotStep === 0) {
+            /* Dari tombol Pesan → pindah ke QRIS */
+            showStep1();
+          } else {
+            /* Dari QRIS → sembunyikan total */
+            hideMascot();
+          }
+        });
+
+        /* -------------------------------------------------------
+         PANTAU PERUBAHAN FORM — tampilkan maskot saat form lengkap
+      ------------------------------------------------------- */
+        const formFields = [
+          "orderDate",
+          "orderName",
+          "orderDevice",
+          "orderLocation",
+          "orderContact",
+        ];
+        let mascotShown = false; /* agar tidak berulang */
+
+        formFields.forEach(function (id) {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.addEventListener("input", checkAndShow);
+          el.addEventListener("change", checkAndShow);
+        });
+
+        function checkAndShow() {
+          if (!mascotShown && isFormComplete()) {
+            mascotShown = true;
+            /* Tunda sedikit agar user tidak kaget */
+            setTimeout(function () {
+              showStep0();
+            }, 600);
+          }
+        }
+
+        /* Gambar frame pertama langsung saat skrip berjalan */
+        drawCharacter(false);
+      })(); /* End of IIFE */
+    </script>
+    <!-- ============================================================
+         END PIXEL MASCOT
+    ============================================================ -->
   </body>
 </html>
