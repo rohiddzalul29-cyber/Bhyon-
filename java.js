@@ -875,9 +875,26 @@ apps.forEach((app, i) => {
     <div class="sub">${app.desc}</div>
     <div class="starting-from">Mulai dari</div>
     <div class="min-price">${app.minPrice}</div>
-    <div class="click-hint">Klik untuk lihat harga →</div>
+    <button class="card-order-btn" data-idx="${i}">Order</button>
   `;
   card.onclick = () => openModal(i);
+  card.querySelector(".card-order-btn").addEventListener("click", function (e) {
+    e.stopPropagation();
+    const appName = apps[i].name;
+    /* Scroll ke section form */
+    document.getElementById("order").scrollIntoView({ behavior: "smooth" });
+    /* Setelah scroll selesai, highlight tombol app di selector */
+    setTimeout(function () {
+      const btns = document.querySelectorAll("#appSelectorGrid .app-sel-btn");
+      let found = false;
+      btns.forEach(function (btn, idx) {
+        if (apps[idx] && apps[idx].name === appName) {
+          btn.click();
+          found = true;
+        }
+      });
+    }, 700);
+  });
   track.appendChild(card);
   const dot = document.createElement("div");
   dot.className = "dot" + (i === 0 ? " active" : "");
@@ -1187,63 +1204,6 @@ function clearSelection() {
   if (activeAppIdx !== null) closeAppBtn(activeAppIdx);
 }
 
-function showMascotWarning(msg) {
-  const wrapper = document.getElementById("mascot-wrapper");
-  const bubbleText = document.getElementById("mascot-bubble-text");
-  const canvas = document.getElementById("mascot-canvas");
-
-  if (!wrapper || !bubbleText) return;
-
-  /* Ubah teks bubble */
-  bubbleText.innerHTML = msg;
-
-  /* Posisikan maskot di atas tombol Pesan */
-  const btnPesan = document.querySelector(".btn-order:not(.btn-qris)");
-  if (btnPesan) {
-    const rect = btnPesan.getBoundingClientRect();
-    const wrapperW = wrapper.offsetWidth || 80;
-    const wrapperH = wrapper.offsetHeight || 130;
-    const centerX = rect.left + rect.width / 2;
-    const topY = rect.top - wrapperH - 8;
-    const left = Math.min(
-      Math.max(8, centerX - wrapperW / 2),
-      window.innerWidth - wrapperW - 8,
-    );
-    const top = Math.max(8, topY);
-    wrapper.style.left = left + "px";
-    wrapper.style.top = top + "px";
-  }
-
-  /* Tampilkan maskot */
-  wrapper.classList.add("mascot-visible");
-
-  /* Animasi lompat / kaget */
-  if (canvas) {
-    canvas.classList.remove("walking", "jumping");
-    void canvas.offsetHeight;
-    canvas.classList.add("jumping");
-    setTimeout(() => {
-      canvas.classList.remove("jumping");
-      canvas.classList.add("walking");
-    }, 600);
-  }
-
-  /* Auto-sembunyikan setelah 4 detik jika user tidak menutup sendiri */
-  clearTimeout(window._mascotWarnTimer);
-  window._mascotWarnTimer = setTimeout(() => {
-    /* Hanya sembunyikan jika pesan masih pesan peringatan (bukan step normal) */
-    if (wrapper.classList.contains("mascot-visible")) {
-      const currentText = bubbleText.innerHTML;
-      if (
-        currentText.includes("Lengkapi") ||
-        currentText.includes("Pilih aplikasi")
-      ) {
-        wrapper.classList.remove("mascot-visible");
-      }
-    }
-  }, 4000);
-}
-
 function submitOrder() {
   const date = document.getElementById("orderDate").value;
   const name = document.getElementById("orderName").value.trim();
@@ -1252,11 +1212,11 @@ function submitOrder() {
   const contact = document.getElementById("orderContact").value.trim();
 
   if (!date || !name || !device || !location || !contact) {
-    showMascotWarning("Hei Bung! Lengkapi dulu<br>semua data kamu ya 📋✍️");
+    alert("⚠️ Mohon lengkapi semua data sebelum memesan!");
     return;
   }
   if (!selectedPrice) {
-    showMascotWarning("Pilih aplikasi &amp;<br>paket dulu ya! 📱👇");
+    alert("⚠️ Silakan pilih aplikasi dan paket harga terlebih dahulu!");
     return;
   }
 
@@ -1685,3 +1645,57 @@ if (dateInput) {
   /* Gambar frame pertama langsung saat skrip berjalan */
   drawCharacter(false);
 })(); /* End of IIFE */
+document.addEventListener("DOMContentLoaded", () => {
+  /* tombol pesan */
+  const tombolPesan =
+    document.querySelector("button[type='submit']") ||
+    document.querySelector(".btn-pesan") ||
+    document.querySelector("#checkout-btn");
+
+  if (!tombolPesan) return;
+
+  tombolPesan.addEventListener("click", function (e) {
+    /* semua input wajib */
+    const inputs = document.querySelectorAll(
+      "input[required], textarea[required], select[required]",
+    );
+
+    let adaKosong = false;
+
+    inputs.forEach((input) => {
+      if (!input.value.trim()) {
+        adaKosong = true;
+      }
+    });
+
+    /* jika ada yang kosong */
+    if (adaKosong) {
+      e.preventDefault();
+
+      /* tampilkan maskot */
+      const mascotWrapper = document.querySelector("#mascot-wrapper");
+      const mascotBubble = document.querySelector(".mascot-bubble");
+      const mascotCanvas = document.querySelector("#mascot-canvas");
+
+      if (mascotWrapper) {
+        mascotWrapper.classList.add("mascot-visible");
+      }
+
+      if (mascotBubble) {
+        mascotBubble.innerHTML =
+          "Hei bung!<br>Kau belum menyelesaikan pemesanan mu.";
+      }
+
+      /* animasi lompat */
+      if (mascotCanvas) {
+        mascotCanvas.classList.remove("walking");
+        mascotCanvas.classList.add("jumping");
+
+        setTimeout(() => {
+          mascotCanvas.classList.remove("jumping");
+          mascotCanvas.classList.add("walking");
+        }, 500);
+      }
+    }
+  });
+});
