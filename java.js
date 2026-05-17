@@ -1224,7 +1224,7 @@ function submitOrder() {
 
   const msg = `🛒 *ORDER BHYON STORE*\n\n📅 Tanggal: ${date}\n👤 Nama: ${name}\n📱 Device: ${device}\n📍 Lokasi: ${location}\n📞 Kontak: ${contact}\n\n${pesananDetail}\n\n_Dikirim dari website Bhyon Store_`;
 
-  const waNumber = "6288272292088";
+  const waNumber = "6285710373349";
   const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
   window.open(url, "_blank");
 }
